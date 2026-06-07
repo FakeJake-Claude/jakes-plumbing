@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Jake’s Plumbing — How your body stores energy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=7">
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <section class="controls">
+      <h2>Body</h2>
+      <div class="row two-col">
+        <div class="field">
+          <label for="weight">Weight</label>
+          <div class="row">
+            <input type="number" id="weight" min="40" max="200" value="75" step="1">
+            <span class="unit">kg</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="bodyfat">Body fat</label>
+          <div class="row">
+            <input type="number" id="bodyfat" min="5" max="60" value="18" step="1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+      </div>
+
+      <h2>Activity</h2>
+      <div id="activities"></div>
+      <button type="button" id="add-activity">+ Add activity</button>
+
+      <h2>Macros <span class="h2-sub">per day</span></h2>
+      <div class="field macro">
+        <label>Fat <span class="kcal" id="fat-kcal">630 kcal</span></label>
+        <div class="slider-row">
+          <input type="range" id="fat-range" min="0" max="300" value="70">
+          <input type="number" id="fat-num" min="0" max="300" value="70">
+          <span class="unit">g</span>
+        </div>
+      </div>
+      <div class="field macro">
+        <label>Carbs <span class="kcal" id="carbs-kcal">1000 kcal</span></label>
+        <div class="slider-row">
+          <input type="range" id="carbs-range" min="0" max="800" value="250">
+          <input type="number" id="carbs-num" min="0" max="800" value="250">
+          <span class="unit">g</span>
+        </div>
+      </div>
+      <div class="field macro">
+        <label>Protein <span class="kcal" id="protein-kcal">600 kcal</span></label>
+        <div class="slider-row">
+          <input type="range" id="protein-range" min="0" max="400" value="150">
+          <input type="number" id="protein-num" min="0" max="400" value="150">
+          <span class="unit">g</span>
+        </div>
+      </div>
+
+      <h2>Accounting <span class="h2-sub">kcal / day</span></h2>
+      <div class="acc">
+        <div class="acc-row"><span class="lbl">Intake</span><span class="val" id="r-intake">—</span></div>
+        <div class="acc-row neg"><span class="lbl">Energy demand</span><span class="val" id="r-demand">—</span></div>
+        <div class="acc-row neg subtle"><span class="lbl">DNL heat loss</span><span class="val" id="r-dnl">0</span></div>
+        <div class="acc-sep"></div>
+        <div class="acc-row total"><span class="lbl">Net balance</span><span class="val" id="r-balance">—</span></div>
+
+        <div class="acc-heading">Storage Δ</div>
+        <div class="acc-row prominent">
+          <span class="lbl">Glycogen</span>
+          <span class="val-g" id="r-glycogen-g">—</span>
+          <span class="val" id="r-glycogen-kcal">—</span>
+        </div>
+        <div class="acc-row prominent">
+          <span class="lbl">Fat tissue</span>
+          <span class="val-g" id="r-fat-g">—</span>
+          <span class="val" id="r-fat-kcal">—</span>
+        </div>
+        <div class="acc-row">
+          <span class="lbl">Muscle</span>
+          <span class="val-g" id="r-muscle-g">—</span>
+          <span class="val" id="r-muscle-kcal">—</span>
+        </div>
+        <div class="acc-sep"></div>
+        <div class="acc-row sum"><span class="lbl">Sum of stores</span><span class="val" id="r-storage-sum">—</span></div>
+      </div>
+
+      <footer class="footnote">
+        <p>Hover a pipe or container to read the biochemistry. Right-click a container to edit its parameters.</p>
+      </footer>
+    </section>
+  </aside>
+
+  <main class="canvas">
+    <svg id="diagram" viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid meet"></svg>
+  </main>
+
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+<div id="nested-tooltip" class="tooltip nested"></div>
+<div id="popup" class="popup" hidden></div>
+
+<script src="glossary.js?v=7"></script>
+<script src="tooltips.js?v=7"></script>
+<script src="diagram.js?v=7"></script>
+<script src="app.js?v=7"></script>
+</body>
+</html>
