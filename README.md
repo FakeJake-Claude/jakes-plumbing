@@ -16,7 +16,7 @@ tooltips.js     Pipe / container / source / sink tooltip text + glossary linking
 diagram.js      SVG construction. Builds nodes, containers, and pipes once.
                 Exposes updatePipeFlow() and updateContainerFill() per render.
 app.js          State, calculations, input wiring, tooltip + popup behaviour.
-                The calculate() function is a pure steady-state model
+                The calculate() function is a pure single-day model
                 and is the only place numbers come from.
 ```
 
@@ -38,14 +38,15 @@ app.js          State, calculations, input wiring, tooltip + popup behaviour.
 
 ## Model notes (v1 simplifications)
 
-- Steady-state daily totals — no diurnal cycle, no postprandial vs fasting distinction.
+- Single-day (acute) totals — no diurnal cycle, no postprandial vs fasting distinction. A deficit beyond the fat (Alpert) cap is bridged by glycogen drawdown before any muscle is catabolised; net stores are only built in an overall energy surplus.
 - BMR uses Katch-McArdle (needs body-fat %).
 - BMR substrate mix fixed at 60% fat / 40% carb.
-- Glycogen capacity = `muscle_mass × 18 g/kg + 100 g` (liver).
+- Glycogen capacity ≈ 15 g per kg body weight (whole-body, muscle + liver) — a supercompensated ceiling; typical resting stores are lower. Default fill 50%.
 - Muscle mass ≈ 45% of lean body mass.
-- MPS demand ≈ 1.6 g protein/kg LBM. Surplus protein is oxidised; gluconeogenesis from protein only activates when carb demand exceeds intake + glycogen and is capped at half of surplus protein.
+- MPS demand ≈ 1.6 g protein/kg body weight (Morton 2018 breakpoint). Surplus protein is oxidised; gluconeogenesis from protein only activates when carb demand exceeds intake + glycogen and is capped at half of surplus protein.
 - De novo lipogenesis runs only after glycogen saturates; ~25% energy cost.
 - Blood glucose is rendered as homeostatic — not editable, default fill 50%.
+- Storage Δ is shown both as dry substrate mass (the energy-carrying macronutrient) and wet tissue mass (substrate + bound water ≈ scale weight): glycogen ×4, adipose ÷0.87, muscle ÷0.22.
 
 ## v2 directions (not built)
 

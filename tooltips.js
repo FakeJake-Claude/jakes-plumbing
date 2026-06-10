@@ -44,11 +44,11 @@ const pipeTooltips = {
   },
   'protein-to-muscle': {
     title: 'Muscle protein synthesis',
-    body: 'Net muscle gain via [muscle protein synthesis]. mTORC1 — activated by leucine and resistance training — drives assembly of new contractile protein. Requires three things together: resistance training, dietary protein above the maintenance threshold (~1.6 g per kg lean mass), and an energy surplus. Even under ideal conditions the body can build at most ~0.5–1 kg of muscle per month — only a few grams of protein laid down per day, far less than the daily protein you eat.'
+    body: 'Net muscle gain via [muscle protein synthesis]. mTORC1 — activated by leucine and resistance training — drives assembly of new contractile protein. Requires three things together: resistance training, dietary protein above the maintenance threshold (~1.6 g per kg body weight), and an energy surplus. Even under ideal conditions the body can build at most ~0.5–1 kg of muscle per month — only a few grams of protein laid down per day, far less than the daily protein you eat.'
   },
   'muscle-to-demand': {
     title: 'Muscle protein breakdown → energy',
-    body: 'When dietary protein can’t cover the amino acids oxidised during exercise — or when the energy deficit outruns the maximum rate fat can be mobilised (~69 kcal per kg of fat per day) — muscle protein is broken down for fuel. Amino acids are deaminated and their carbon skeletons feed the [TCA cycle]; nitrogen is excreted as urea. This is why very lean people, or anyone training hard while underfed, lose muscle.'
+    body: 'When dietary protein can’t cover the amino acids oxidised during exercise — or when an energy deficit outruns BOTH the maximum rate fat can be mobilised (~48 kcal per kg of fat per day) AND the glycogen available to bridge the gap — muscle protein is broken down for fuel. On a single deficit day glycogen usually covers any shortfall beyond the fat cap; only a sustained deficit depletes glycogen and forces this catabolism. Amino acids are deaminated and their carbon skeletons feed the [TCA cycle]; nitrogen is excreted as urea. This is why very lean people, or anyone training hard while underfed, lose muscle.'
   },
   'muscle-to-bg': {
     title: 'Muscle catabolism → gluconeogenesis',
@@ -63,7 +63,7 @@ const containerTooltips = {
   },
   glycogen: {
     title: 'Glycogen',
-    body: 'Branched polymer of glucose, stored ~80% in muscle and ~20% in liver. Whole-body capacity is roughly 15 g per kg of body weight (about 1,100 g for a 75 kg person). [Glycogenesis] fills this store only up to that ceiling — once full, surplus carbohydrate is diverted to [de novo lipogenesis] and stored as fat instead. The bar shows the level your current carb intake drives toward: high carb fills it to the cap, low carb drains it. Muscle glycogen fuels local contraction; liver glycogen exports glucose to keep blood sugar steady between meals.'
+    body: 'Branched polymer of glucose, stored ~80% in muscle and ~20% in liver. Whole-body capacity is roughly 15 g per kg of body weight (about 1,100 g for a 75 kg person) — a supercompensated ceiling reached only with carbohydrate loading; typical resting stores are lower, ~400–700 g. [Glycogenesis] fills this store only up to that ceiling — once full, surplus carbohydrate is diverted to [de novo lipogenesis] and stored as fat instead. The bar shows the level your current carb intake drives toward: high carb fills it to the cap, low carb drains it. Muscle glycogen fuels local contraction; liver glycogen exports glucose to keep blood sugar steady between meals.'
   },
   fat: {
     title: 'Fat tissue (adipose)',

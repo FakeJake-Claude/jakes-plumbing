@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=1280">
 <title>Jake’s Plumbing — How your body stores energy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 <div class="layout">
@@ -71,19 +72,28 @@
         <div class="acc-row total"><span class="lbl">Net balance</span><span class="val" id="r-balance">—</span></div>
 
         <div class="acc-heading">Storage Δ</div>
-        <div class="acc-row prominent">
+        <div class="acc-row store col-head">
+          <span class="lbl"></span>
+          <span class="val-g">dry</span>
+          <span class="val-wet">wet</span>
+          <span class="val">kcal</span>
+        </div>
+        <div class="acc-row store prominent">
           <span class="lbl">Glycogen</span>
           <span class="val-g" id="r-glycogen-g">—</span>
+          <span class="val-wet" id="r-glycogen-wet">—</span>
           <span class="val" id="r-glycogen-kcal">—</span>
         </div>
-        <div class="acc-row prominent">
+        <div class="acc-row store prominent">
           <span class="lbl">Fat tissue</span>
           <span class="val-g" id="r-fat-g">—</span>
+          <span class="val-wet" id="r-fat-wet">—</span>
           <span class="val" id="r-fat-kcal">—</span>
         </div>
-        <div class="acc-row">
+        <div class="acc-row store">
           <span class="lbl">Muscle</span>
           <span class="val-g" id="r-muscle-g">—</span>
+          <span class="val-wet" id="r-muscle-wet">—</span>
           <span class="val" id="r-muscle-kcal">—</span>
         </div>
         <div class="acc-sep"></div>
@@ -91,7 +101,7 @@
       </div>
 
       <footer class="footnote">
-        <p>Hover a pipe or container to read the biochemistry. Right-click a container to edit its parameters.</p>
+        <p>Hover a pipe or container to read the biochemistry. Click the ✎ on a container to adjust it.</p>
       </footer>
     </section>
   </aside>
@@ -106,9 +116,9 @@
 <div id="nested-tooltip" class="tooltip nested"></div>
 <div id="popup" class="popup" hidden></div>
 
-<script src="glossary.js?v=7"></script>
-<script src="tooltips.js?v=7"></script>
-<script src="diagram.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="glossary.js?v=9"></script>
+<script src="tooltips.js?v=9"></script>
+<script src="diagram.js?v=9"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

@@ -12,7 +12,7 @@ const state = {
   fat: 70,
   activities: [],                  // [{ type, kcal }]
   glycogenCapacityOverride: null,
-  glycogenFillFraction: 0.75,
+  glycogenFillFraction: 0.5,
   fatMassOverride: null,
   bgFillFraction: 0.5
 };
@@ -24,11 +24,15 @@ const activityRates = {
 };
 
 // --- Physiological constants (sourced from the literature) ---
-const FAT_MAX_KCAL_PER_KG   = 69;    // max fat mobilization ≈ 290 kJ/kg fat/day (Alpert)
+const FAT_MAX_KCAL_PER_KG   = 48;    // max fat mobilization ≈ 48 kcal/kg fat/day — Alpert's unpublished
+                                     // downward correction (~22 kcal/lb). Orig. published value was
+                                     // 290 kJ/kg ≈ 69 kcal/kg; the lower figure is anecdotal, not peer-reviewed.
 const DNL_MAX_FAT_G         = 150;   // max de-novo-lipogenesis fat synthesis g/day
 const DNL_EFFICIENCY        = 0.75;  // ~25% energy lost converting carb → fat
 const MUSCLE_PROTEIN_FRAC   = 0.22;  // protein fraction of wet muscle mass
 const MUSCLE_GAIN_MAX_WET_G = 33;    // ceiling ≈ 1 kg muscle/month (novice, ideal conditions)
+const GLYCOGEN_WATER_RATIO  = 3;     // g water bound per g glycogen → wet ≈ 4× the dry mass
+const FAT_TISSUE_LIPID_FRAC = 0.87;  // lipid fraction of adipose tissue → wet ≈ dry / 0.87
 const GLYCOGEN_G_PER_KG     = 15;    // max glycogen store ≈ 15 g per kg body weight
 
 function activityMinutes(a) {
@@ -62,10 +66,10 @@ function calculate() {
     rawActCarb += a.kcal * (1 - r.fatPct);
     if (r.resistance) gymPresent = true;
   }
-  // Protein's share of exercise energy rises as dietary carbs run low (~5%→15%).
+  // Protein's share of exercise energy rises as dietary carbs run low (~5%→10%).
   const carbRefG = state.weight * 2;
   const carbAdequacy = Math.max(0, Math.min(1, state.carbs / Math.max(carbRefG, 1)));
-  const exerciseProteinFrac = 0.05 + 0.10 * (1 - carbAdequacy);
+  const exerciseProteinFrac = 0.05 + 0.05 * (1 - carbAdequacy);
   const actProteinKcal = actKcal * exerciseProteinFrac;
   const actFatKcal     = rawActFat  * (1 - exerciseProteinFrac);
   const actCarbKcal    = rawActCarb * (1 - exerciseProteinFrac);
@@ -82,22 +86,27 @@ function calculate() {
   const intakeKcal    = carbInKcal + fatInKcal + proteinInKcal;
 
   // =========================================================================
-  // CARB SIDE — glycogen storage (capped) → DNL (capped) → drain in deficit
+  // CARB SIDE — glycogen storage (capped) → DNL (capped) → drain in deficit.
+  // Stores are only BUILT out of an overall energy surplus: while in a deficit
+  // a local carb surplus is oxidised (sparing other fuels), never stored — the
+  // body does not lay down glycogen at the same time it is short of energy.
   // =========================================================================
+  const energyBalanceKcal = intakeKcal - totalDemand;
   let toGlycogenKcal = 0, glycogenDrainKcal = 0;
   let dnlGlucoseKcal = 0, dnlStoredKcal = 0, dnlHeatLossKcal = 0;
   let carbExcessOxidizedKcal = 0;
 
   if (carbInKcal >= carbDemandKcal) {
-    const carbSurplus = carbInKcal - carbDemandKcal;
-    toGlycogenKcal = Math.min(carbSurplus, glycogenHeadroomKcal);
-    const carbAfterGly = carbSurplus - toGlycogenKcal;
+    const carbSurplus  = carbInKcal - carbDemandKcal;
+    const storableKcal = Math.max(0, Math.min(carbSurplus, energyBalanceKcal));
+    toGlycogenKcal = Math.min(storableKcal, glycogenHeadroomKcal);
+    const carbAfterGly = storableKcal - toGlycogenKcal;
     // DNL: cap fat synthesised at DNL_MAX_FAT_G/day
     dnlStoredKcal   = Math.min(carbAfterGly * DNL_EFFICIENCY, DNL_MAX_FAT_G * 9);
     dnlGlucoseKcal  = dnlStoredKcal / DNL_EFFICIENCY;
     dnlHeatLossKcal = dnlGlucoseKcal - dnlStoredKcal;
-    // carbs beyond DNL capacity are simply oxidised (sparing dietary fat → stored)
-    carbExcessOxidizedKcal = carbAfterGly - dnlGlucoseKcal;
+    // carbs not stored (energy deficit, or beyond DNL capacity) are oxidised
+    carbExcessOxidizedKcal = carbSurplus - toGlycogenKcal - dnlGlucoseKcal;
   } else {
     const carbDeficit = carbDemandKcal - carbInKcal;
     glycogenDrainKcal = Math.min(carbDeficit, glycogenAvailKcal);
@@ -120,11 +129,19 @@ function calculate() {
 
   const muscleSubstrateKcal = muscleForExerciseKcal + muscleForGngKcal;
 
-  // Fat supplies up to its daily cap; muscle covers any remaining energy gap.
+  // Fat supplies up to its daily (Alpert) cap. That ceiling is a SUSTAINED-rate
+  // limit, so on a single deficit day the gap beyond it is first bridged by
+  // drawing down whatever glycogen remains — glycogen is the body's short-term
+  // energy buffer and its loss is readily reversible. Muscle protein is only
+  // catabolised once glycogen is exhausted.
   const fatMaxKcal = fatMassKg * FAT_MAX_KCAL_PER_KG;
   const afterGlyAndMuscleSub = storesNeededKcal - glycogenDrainKcal - muscleSubstrateKcal;
   const fatDrainKcal   = Math.max(0, Math.min(fatMaxKcal, afterGlyAndMuscleSub));
-  const extraMuscleKcal = Math.max(0, afterGlyAndMuscleSub - fatDrainKcal);
+  const energyGapAfterFat     = Math.max(0, afterGlyAndMuscleSub - fatDrainKcal);
+  const glycogenForEnergyKcal = Math.min(energyGapAfterFat,
+                                         Math.max(0, glycogenAvailKcal - glycogenDrainKcal));
+  const extraMuscleKcal        = Math.max(0, energyGapAfterFat - glycogenForEnergyKcal);
+  let   glycogenDrainTotalKcal = glycogenDrainKcal + glycogenForEnergyKcal;
 
   const muscleCatabolismKcal = muscleSubstrateKcal + extraMuscleKcal;
   const muscleToBgKcal       = muscleForGngKcal;
@@ -134,7 +151,7 @@ function calculate() {
   // MUSCLE GAIN — only with training + adequate protein + energy surplus
   // =========================================================================
   const netBalanceKcal = intakeKcal - totalDemand - dnlHeatLossKcal;
-  const maintenanceProteinG = 1.6 * lbm;
+  const maintenanceProteinG = 1.6 * state.weight;   // Morton 2018 breakpoint is per kg body weight
   let muscleGainKcal = 0;
   if (muscleCatabolismKcal === 0 && gymPresent &&
       state.protein >= maintenanceProteinG && netBalanceKcal > 0) {
@@ -148,21 +165,21 @@ function calculate() {
   // =========================================================================
   // OXIDATION PIPES — must sum to totalDemand (energy conserving)
   // =========================================================================
-  const glucoseInKcal      = carbInKcal + glycogenDrainKcal + proteinToGngKcal + muscleToBgKcal;
+  const glucoseInKcal      = carbInKcal + glycogenDrainTotalKcal + proteinToGngKcal + muscleToBgKcal;
   const glucoseStoredKcal  = toGlycogenKcal + dnlGlucoseKcal;
-  const bgToDemandKcal     = glucoseInKcal - glucoseStoredKcal;   // glucose oxidised
+  let   bgToDemandKcal     = glucoseInKcal - glucoseStoredKcal;   // glucose oxidised
 
   let demandRemaining = totalDemand - bgToDemandKcal - muscleToDemandKcal;
 
   // dietary protein not used for GNG / muscle gain is oxidised (incl. exercise AA)
   const proteinAvailOxKcal = proteinInKcal - proteinToGngKcal - proteinToMuscleKcal;
-  const proteinToDemandKcal = Math.min(proteinAvailOxKcal, Math.max(0, demandRemaining));
+  let   proteinToDemandKcal = Math.min(proteinAvailOxKcal, Math.max(0, demandRemaining));
   demandRemaining -= proteinToDemandKcal;
 
-  const fatInToDemandKcal = Math.min(fatInKcal, Math.max(0, demandRemaining));
+  let   fatInToDemandKcal = Math.min(fatInKcal, Math.max(0, demandRemaining));
   demandRemaining -= fatInToDemandKcal;
 
-  const fatTissueToDemandKcal = Math.max(0, demandRemaining);   // == fatDrainKcal
+  let   fatTissueToDemandKcal = Math.max(0, demandRemaining);   // == fatDrainKcal
 
   // =========================================================================
   // STORAGE PIPES
@@ -172,10 +189,29 @@ function calculate() {
   let   fatInToFatTissueKcal = fatInSurplusKcal + proteinToFatKcal;
   const bgToFatKcal        = dnlGlucoseKcal;                            // DNL pipe
 
+  // In an overall energy deficit nothing is laid down on net. The substrate
+  // bookkeeping above can still leave dietary fat / surplus protein "unburned"
+  // when a store (usually glycogen) was drained to cover a demand component —
+  // which would otherwise render as fat being STORED mid-deficit. Redirect that
+  // food to oxidation and shrink the store drain by the same amount, so no
+  // storage pipe shows while in deficit. Energy- and mass-conserving: the net
+  // glycogen / fat / muscle deltas are unchanged.
+  if (netBalanceKcal < 0 && fatInToFatTissueKcal > 0) {
+    const redirect = fatInToFatTissueKcal;
+    proteinToDemandKcal += proteinToFatKcal;   // surplus protein is oxidised, not stored
+    fatInToDemandKcal   += fatInSurplusKcal;   // dietary-fat surplus is oxidised, not stored
+    fatInToFatTissueKcal = 0;
+    const fromFat = Math.min(redirect, fatTissueToDemandKcal);
+    fatTissueToDemandKcal -= fromFat;
+    const fromGly = Math.min(redirect - fromFat, glycogenDrainTotalKcal);
+    glycogenDrainTotalKcal -= fromGly;
+    bgToDemandKcal         -= fromGly;
+  }
+
   // =========================================================================
   // DELTAS + reconciliation (storage sum must equal net balance)
   // =========================================================================
-  const glycogenDeltaG     = (toGlycogenKcal - glycogenDrainKcal) / 4;
+  const glycogenDeltaG     = (toGlycogenKcal - glycogenDrainTotalKcal) / 4;
   const muscleProteinDeltaG = (muscleGainKcal - muscleCatabolismKcal) / 4;
   let   fatTissueKcalDelta = fatInToFatTissueKcal + dnlStoredKcal - fatTissueToDemandKcal;
 
@@ -188,17 +224,22 @@ function calculate() {
   }
 
   const fatTissueDeltaG = fatTissueKcalDelta / 9;
-  const muscleDeltaG    = muscleProteinDeltaG / MUSCLE_PROTEIN_FRAC;
+  const muscleDeltaG    = muscleProteinDeltaG;   // protein-substrate grams (kcal / 4), consistent with the fat row
   const storageSumKcal  = glycogenDeltaG * 4 + fatTissueKcalDelta + muscleProteinDeltaG * 4;
+
+  // Wet-tissue (scale-weight) equivalents: the substrate mass plus its bound water.
+  const glycogenWetDeltaG = glycogenDeltaG * (1 + GLYCOGEN_WATER_RATIO);
+  const fatWetDeltaG      = fatTissueDeltaG / FAT_TISSUE_LIPID_FRAC;
+  const muscleWetDeltaG   = muscleProteinDeltaG / MUSCLE_PROTEIN_FRAC;
 
   return {
     lbm, fatMassKg, muscleMassG, bmr, actKcal,
-    bmrCarbKcal, bmrFatKcal, actCarbKcal, actFatKcal,
+    bmrCarbKcal, bmrFatKcal, actCarbKcal, actFatKcal, actProteinKcal,
     intakeKcal, totalDemand, netBalanceKcal, storageSumKcal,
     dnlHeatLossKcal,
-    glycogenCapacity, currentGlycogenG, glycogenDeltaG,
-    fatMassG: fatMassKg * 1000, fatTissueDeltaG,
-    muscleDeltaG, muscleProteinDeltaG,
+    glycogenCapacity, currentGlycogenG, glycogenDeltaG, glycogenWetDeltaG,
+    fatMassG: fatMassKg * 1000, fatTissueDeltaG, fatWetDeltaG,
+    muscleDeltaG, muscleProteinDeltaG, muscleWetDeltaG,
     sources: {
       protein: { g: state.protein, kcal: proteinInKcal },
       carbs:   { g: state.carbs,   kcal: carbInKcal },
@@ -207,7 +248,7 @@ function calculate() {
     flows: {
       'carbs-to-bg':         carbInKcal,
       'bg-to-glycogen':      toGlycogenKcal,
-      'glycogen-to-bg':      glycogenDrainKcal,
+      'glycogen-to-bg':      glycogenDrainTotalKcal,
       'bg-to-fat':           bgToFatKcal,
       'bg-to-demand':        bgToDemandKcal,
       'fat-in-to-fattissue': fatInToFatTissueKcal,
@@ -247,10 +288,13 @@ function render() {
   balEl.style.color = c.netBalanceKcal >= 0 ? 'var(--protein-dark)' : 'var(--fat-dark)';
 
   document.getElementById('r-glycogen-g').textContent    = fmtG(c.glycogenDeltaG);
+  document.getElementById('r-glycogen-wet').textContent  = fmtG(c.glycogenWetDeltaG);
   document.getElementById('r-glycogen-kcal').textContent = fmt(c.glycogenDeltaG * 4);
   document.getElementById('r-fat-g').textContent    = fmtG(c.fatTissueDeltaG);
+  document.getElementById('r-fat-wet').textContent  = fmtG(c.fatWetDeltaG);
   document.getElementById('r-fat-kcal').textContent = fmt(c.fatTissueDeltaG * 9);
   document.getElementById('r-muscle-g').textContent    = fmtG(c.muscleDeltaG);
+  document.getElementById('r-muscle-wet').textContent  = fmtG(c.muscleWetDeltaG);
   document.getElementById('r-muscle-kcal').textContent = fmt(c.muscleProteinDeltaG * 4);
   document.getElementById('r-storage-sum').textContent = fmt(c.storageSumKcal);
 
@@ -269,12 +313,25 @@ function render() {
 // ---------- Input wiring ----------
 function bindNumber(id, key, opts = {}) {
   const inp = document.getElementById(id);
-  inp.addEventListener('input', () => {
-    let v = parseFloat(inp.value);
-    if (isNaN(v)) return;
+  const clamp = v => {
     if (opts.min !== undefined) v = Math.max(opts.min, v);
     if (opts.max !== undefined) v = Math.min(opts.max, v);
+    return v;
+  };
+  // Live updates keep the model in sync while typing, without fighting the field.
+  inp.addEventListener('input', () => {
+    const v = parseFloat(inp.value);
+    if (isNaN(v)) return;
+    state[key] = clamp(v);
+    render();
+  });
+  // On commit (blur / Enter) snap the displayed value to the clamped result.
+  inp.addEventListener('change', () => {
+    let v = parseFloat(inp.value);
+    if (isNaN(v)) { inp.value = state[key]; return; }
+    v = clamp(v);
     state[key] = v;
+    inp.value = v;
     render();
   });
 }
@@ -344,6 +401,13 @@ function renderActivities() {
       render();
     });
   });
+
+  const addBtn = document.getElementById('add-activity');
+  if (addBtn) {
+    const atMax = state.activities.length >= 4;
+    addBtn.disabled = atMax;
+    addBtn.textContent = atMax ? 'Maximum of 4 activities' : '+ Add activity';
+  }
 }
 
 // ---------- Tooltip (smooth fade; nested stays open when the cursor moves onto it) ----------
@@ -486,6 +550,13 @@ function attachSvgDelegation(svg) {
     e.preventDefault();
     showPopup(key, e.clientX, e.clientY);
   });
+
+  // The ✎ badge on editable containers opens the same editor with a normal click
+  // (discoverable, and works where right-click isn't available).
+  svg.addEventListener('click', e => {
+    const editHit = e.target.closest('[data-edit-id]');
+    if (editHit && editHit.dataset.editId) showPopup(editHit.dataset.editId, e.clientX, e.clientY);
+  });
 }
 
 // ---------- Popup (right-click on container) ----------
@@ -545,7 +616,7 @@ function showPopup(kind, x, y) {
   document.getElementById('pp-reset').onclick = () => {
     if (kind === 'glycogen') {
       state.glycogenCapacityOverride = null;
-      state.glycogenFillFraction = 0.75;
+      state.glycogenFillFraction = 0.5;
     } else if (kind === 'fat') {
       state.fatMassOverride = null;
     }

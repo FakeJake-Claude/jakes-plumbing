@@ -110,6 +110,8 @@ input[type="number"]:focus { outline: 1px solid var(--neutral-dark); border-colo
   margin-top: 2px;
 }
 #add-activity:hover { background: var(--bg-soft); color: var(--text); }
+#add-activity:disabled { opacity: 0.5; cursor: default; }
+#add-activity:disabled:hover { background: transparent; color: var(--text-soft); }
 
 .activity-row {
   display: grid;
@@ -177,6 +179,19 @@ input[type="number"]:focus { outline: 1px solid var(--neutral-dark); border-colo
 .acc-row .lbl { color: var(--text-soft); }
 .acc-row .val { font-weight: 500; min-width: 64px; text-align: right; }
 .acc-row .val-g { color: var(--text-soft); font-size: 11px; min-width: 50px; text-align: right; }
+.acc-row .val-wet { color: var(--text-soft); font-size: 11px; min-width: 50px; text-align: right; }
+.acc-row.store { grid-template-columns: 1fr auto auto auto; }
+.acc-row.col-head { padding-bottom: 0; }
+.acc-row.col-head .lbl,
+.acc-row.col-head .val-g,
+.acc-row.col-head .val-wet,
+.acc-row.col-head .val {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  opacity: 0.7;
+}
 .acc-row.neg .val { color: var(--text); }
 .acc-row.neg.subtle .lbl,
 .acc-row.neg.subtle .val { color: var(--text-soft); font-size: 11px; }
@@ -264,12 +279,25 @@ input[type="number"]:focus { outline: 1px solid var(--neutral-dark); border-colo
 .container-fill { transition: height 0.3s ease, y 0.3s ease; }
 .bar-fill { transition: width 0.3s ease; }
 
-.container-group { cursor: context-menu; }
+.container-group.editable { cursor: context-menu; }
 .container-group .container-rect-bg {
   stroke-width: 1.5;
   transition: stroke-width 0.2s;
 }
 .container-group:hover .container-rect-bg { stroke-width: 2.5; }
+
+/* Edit affordance (✎) on editable containers — brightens on container hover */
+.container-edit {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  fill: var(--text-soft);
+  text-anchor: middle;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.2s, fill 0.2s;
+}
+.container-edit-hit { cursor: pointer; }
+.container-group.editable:hover .container-edit { opacity: 1; fill: var(--text); }
 
 /* Pipes */
 .pipe {

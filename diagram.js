@@ -66,10 +66,10 @@ const layout = {
     fat:     { cx: 1000, cy: 85, label: 'Fat',          macro: 'fat',     max: 300, minG: () => 50 }
   },
   containers: {
-    muscle:   { x:  80, y: 270, w: 200, h: 130, macro: 'muscle',  label: 'Muscle tissue',  alwaysFull: true },
+    muscle:   { x:  80, y: 270, w: 200, h: 130, macro: 'muscle',  label: 'Muscle tissue' },
     bg:       { x: 540, y: 270, w: 120, h:  70, macro: 'neutral', label: 'Blood glucose' },
-    fat:      { x: 900, y: 270, w: 200, h: 160, macro: 'fat',     label: 'Fat tissue',     alwaysFull: true },
-    glycogen: { x: 440, y: 490, w: 300, h: 120, macro: 'carb',    label: 'Glycogen' }
+    fat:      { x: 900, y: 270, w: 200, h: 160, macro: 'fat',     label: 'Fat tissue',  editable: true },
+    glycogen: { x: 440, y: 490, w: 300, h: 120, macro: 'carb',    label: 'Glycogen',    editable: true }
   },
   sink: { cx: 600, cy: 775, r: 70, label: 'BMR + Activity' },
   // Pipes are polylines (waypoints); rounded at the corners.
@@ -190,7 +190,7 @@ function buildDiagram(svg) {
   svg.append(containersGroup);
   for (const [key, c] of Object.entries(layout.containers)) {
     const colour = macroColours[c.macro];
-    const g = el('g', { class: 'container-group' });
+    const g = el('g', { class: 'container-group' + (c.editable ? ' editable' : '') });
     const bgRect = el('rect', {
       x: c.x, y: c.y, width: c.w, height: c.h, rx: 5, ry: 5,
       fill: colour.light, stroke: colour.dark, class: 'container-rect-bg'
@@ -211,6 +211,16 @@ function buildDiagram(svg) {
       class: 'container-hit', 'data-container-id': key
     });
     g.append(bgRect, fillRect, label, inside1, inside2, inside3, hit);
+    if (c.editable) {
+      const ex = c.x + c.w - 15, ey = c.y + 6;
+      const editGlyph = el('text', { x: ex + 7, y: ey + 13, class: 'container-edit' });
+      editGlyph.textContent = '✎';   // ✎ pencil — click to edit (see app.js delegation)
+      const editHit = el('rect', {
+        x: ex - 3, y: ey - 2, width: 24, height: 24, fill: 'transparent',
+        class: 'container-edit-hit', 'data-edit-id': key
+      });
+      g.append(editGlyph, editHit);
+    }
     containersGroup.append(g);
     containerElements[key] = { bgRect, fillRect, inside1, inside2, inside3 };
   }
@@ -254,32 +264,36 @@ function updateDiagram(calc) {
 
   setContainerFill('bg', 0.5, '~5 g', '', '');
 
-  // Glycogen — show the level it's HEADING toward so the cap is visible.
+  // Glycogen — show the level it's HEADING toward (dry), plus the wet weight
+  // (glycogen + its bound water ≈ "water weight" on the scale).
   const projGlyG = Math.max(0, Math.min(calc.glycogenCapacity, calc.currentGlycogenG + calc.glycogenDeltaG));
   setContainerFill('glycogen',
     projGlyG / calc.glycogenCapacity,
-    `${Math.round(projGlyG).toLocaleString('en-US')} / ${Math.round(calc.glycogenCapacity).toLocaleString('en-US')} g`,
-    fmtKcal(projGlyG * 4),
-    'max 15 g / kg body wt');
+    `${Math.round(projGlyG).toLocaleString('en-US')} / ${Math.round(calc.glycogenCapacity).toLocaleString('en-US')} g dry`,
+    `${Math.round(projGlyG * 4).toLocaleString('en-US')} g incl. water`,
+    'supercompensated max ≈15 g/kg');
 
-  // Fat tissue — net daily change → kg/month (dietary fat + DNL − mobilisation).
+  // Fat tissue — fill height shows adiposity (fraction of body mass that is fat);
+  // the text reports absolute mass and the projected monthly change.
   const fatKg = calc.fatMassG / 1000;
-  setContainerFill('fat', 1.0,
+  setContainerFill('fat', Math.min(1, fatKg / state.weight),
     `${fatKg.toFixed(1)} kg  ·  ${fmtKcal(fatKg * 7700)}`,
-    monthLine(calc.fatTissueDeltaG), '');
+    monthBoth(calc.fatTissueDeltaG, calc.fatWetDeltaG), '');
 
-  // Muscle — net daily change → kg/month (MPS gain vs breakdown).
+  // Muscle — fill height shows muscularity (skeletal-muscle fraction of body mass).
   const muscleKg = calc.muscleMassG / 1000;
-  setContainerFill('muscle', 1.0,
+  setContainerFill('muscle', Math.min(1, muscleKg / state.weight),
     `${muscleKg.toFixed(1)} kg  ·  ${fmtKcal(muscleKg * 1000 * 0.22 * 4)}`,
-    monthLine(calc.muscleDeltaG), '');
+    monthBoth(calc.muscleDeltaG, calc.muscleWetDeltaG), '');
 
   if (sinkElements.demand) {
     sinkElements.demand.kcalText.textContent = fmtKcalShort(calc.totalDemand);
     const fatBurn  = Math.round(calc.bmrFatKcal  + calc.actFatKcal);
     const carbBurn = Math.round(calc.bmrCarbKcal + calc.actCarbKcal);
-    sinkElements.demand.splitText.textContent =
-      `${fatBurn.toLocaleString('en-US')} fat · ${carbBurn.toLocaleString('en-US')} carb kcal`;
+    const protBurn = Math.round(calc.actProteinKcal || 0);   // amino-acid share of activity
+    let split = `${fatBurn.toLocaleString('en-US')} fat · ${carbBurn.toLocaleString('en-US')} carb`;
+    if (protBurn > 0) split += ` · ${protBurn.toLocaleString('en-US')} protein`;
+    sinkElements.demand.splitText.textContent = split + ' kcal';
   }
 }
 
@@ -340,6 +354,15 @@ function monthLine(gramsPerDay) {
   if (Math.abs(kgPerMonth) < 0.05) return '';
   const sign = kgPerMonth >= 0 ? '+' : '−';
   return `${sign}${Math.abs(kgPerMonth).toFixed(1)} kg / month`;
+}
+
+// Monthly projection showing dry (substrate) and wet (tissue) mass side by side.
+function monthBoth(dryGramsPerDay, wetGramsPerDay) {
+  const kgM = g => g * 30.4 / 1000;
+  const wet = kgM(wetGramsPerDay);
+  if (Math.abs(wet) < 0.05) return '';
+  const f = x => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(1);
+  return `${f(kgM(dryGramsPerDay))} dry · ${f(wet)} wet  kg/mo`;
 }
 
 function fmtKcal(k)      { return Math.round(k).toLocaleString('en-US') + ' kcal'; }
